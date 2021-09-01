@@ -1,15 +1,21 @@
 const express = require("express");
 const app = express();
 const users = [];
-const bcrypt = require("bcrypt");
+
 const passport = require("passport");
 const flash = require("express-flash");
 const session = require("express-session");
 const methodOverride = require("method-override");
+const config = require("./config");
+require("./config/database.config");
 
-if (process.env.NODE_ENV !== "production") {
-  require("dotenv").config();
-}
+process.on("uncaughtException", (...params) => {
+  console.log(params);
+});
+
+process.on("unhandledRejection", (...params) => {
+  console.log(params);
+});
 
 const initializePassport = require("./passport-config");
 initializePassport(
@@ -23,7 +29,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(flash());
 app.use(
   session({
-    secret: process.env.SESSION_SECRET,
+    secret: config.Server.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
   })
@@ -32,65 +38,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 app.use(methodOverride("_method"));
 
-app.get("/", checkAuthenticated, (req, res) => {
-  res.render("index.ejs", { user: req.user.name });
-});
+app.use(require("./route"));
 
-app.get("/login", checkNotAuthenticated, (req, res) => {
-  res.render("login.ejs");
-});
-
-app.get("/register", checkNotAuthenticated, (req, res) => {
-  res.render("register.ejs");
-});
-
-app.post(
-  "/login",
-  checkNotAuthenticated,
-  passport.authenticate("local", {
-    successRedirect: "/",
-    failureRedirect: "/login",
-    failureFlash: true,
-  })
-);
-
-app.post("/register", checkNotAuthenticated, async (req, res) => {
-  try {
-    const hashed = await bcrypt.hash(req.body.password, 10);
-    users.push({
-      id: Date.now(),
-      name: req.body.name,
-      email: req.body.email,
-      password: hashed,
-    });
-    console.log("users", users);
-    res.redirect("/login");
-  } catch (error) {
-    res.redirect("/register");
-  }
-});
-
-app.delete("/logout", (req, res) => {
-  req.logOut();
-  res.redirect("/login");
-});
-
-function checkAuthenticated(req, res, next) {
-  console.log("req.isAuthenticated()", req.isAuthenticated());
-  if (req.isAuthenticated()) {
-    return next();
-  }
-
-  res.redirect("/login");
-}
-
-function checkNotAuthenticated(req, res, next) {
-  if (req.isAuthenticated()) {
-    return res.redirect("/");
-  }
-  next();
-}
-
-app.listen(3000, () => {
-  console.log("Server started at 3000");
+app.listen(config.Server.PORT, () => {
+  console.log(`Server started at ${config.Server.PORT}`);
 });
